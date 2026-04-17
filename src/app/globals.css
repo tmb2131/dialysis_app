@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 20% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 20% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 20% 12%;
+    --primary: 175 84% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 20% 12%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 15% 45%;
+    --accent: 167 85% 94%;
+    --accent-foreground: 175 84% 22%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 175 84% 32%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 222 25% 8%;
+    --foreground: 210 20% 96%;
+    --card: 222 22% 11%;
+    --card-foreground: 210 20% 96%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 173 80% 45%;
+    --primary-foreground: 222 25% 8%;
+    --secondary: 217 20% 16%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 217 20% 16%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 175 70% 18%;
+    --accent-foreground: 172 66% 70%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 210 20% 96%;
+    --border: 217 20% 20%;
+    --input: 217 20% 20%;
+    --ring: 173 80% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Numeric inputs: mobile numeric keyboard */
+input[inputmode="decimal"]::-webkit-outer-spin-button,
+input[inputmode="decimal"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[inputmode="decimal"] {
+  -moz-appearance: textfield;
+}
