@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, FileText, Pill, Plus } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { ClinicalNote, Lab, Medication } from "@/lib/types";
 import { LabPanelForm } from "./lab-panel-form";
 import { MedicationForm } from "./medication-form";
@@ -262,6 +262,7 @@ export function LabsChart({
   );
 
   const hasData = chartData.length > 0;
+  const hasTimeline = medEvents.length > 0 || notes.length > 0;
 
   function toggle(name: string) {
     setSelected((cur) =>
@@ -337,6 +338,12 @@ export function LabsChart({
         </div>
       </CardHeader>
       <CardContent>
+        <div
+          className={cn(
+            hasTimeline && "lg:grid lg:grid-cols-3 lg:items-start lg:gap-6",
+          )}
+        >
+          <div className={cn(hasTimeline && "lg:col-span-2")}>
         {!hasData ? (
           <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
             {allLabNames.length === 0
@@ -635,9 +642,11 @@ export function LabsChart({
           </div>
         )}
 
+          </div>
+
         {/* Medication / notes timeline, clickable, with marker popover below */}
-        {(medEvents.length > 0 || notes.length > 0) && (
-          <div className="mt-4 space-y-3 border-t pt-4">
+        {hasTimeline && (
+          <div className="mt-4 space-y-3 border-t pt-4 lg:col-span-1 lg:mt-0 lg:max-h-[28rem] lg:overflow-y-auto lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
             {medEvents.length > 0 && (
               <div>
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -753,6 +762,7 @@ export function LabsChart({
               )}
           </div>
         )}
+        </div>
       </CardContent>
 
       <LabPanelForm
