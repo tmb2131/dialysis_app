@@ -64,6 +64,18 @@ function groupByDate(events: MedEvent[]): Map<string, MedEvent[]> {
   return map;
 }
 
+type Range = { low?: number; high?: number };
+
+function flagValue(
+  value: number | null | undefined,
+  range: Range | undefined,
+): "low" | "high" | null {
+  if (value == null || typeof value !== "number" || !range) return null;
+  if (range.low != null && value < range.low) return "low";
+  if (range.high != null && value > range.high) return "high";
+  return null;
+}
+
 export function LabsChart({
   labs,
   medications,
@@ -161,6 +173,7 @@ export function LabsChart({
           <CardTitle>Labs over time</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             Vertical markers indicate medication changes. Click one for details.
+            Points ringed in red fall outside the reference range.
           </p>
         </div>
         <Popover>
@@ -225,6 +238,7 @@ export function LabsChart({
                     <ChartTooltip
                       {...props}
                       medEventsByDate={medEventsByDate}
+                      referenceRanges={referenceRanges}
                     />
                   )}
                 />
@@ -260,19 +274,63 @@ export function LabsChart({
                     style={{ cursor: "pointer" }}
                   />
                 ))}
-                {selected.map((name) => (
-                  <Line
-                    key={name}
-                    type="monotone"
-                    dataKey={name}
-                    stroke={colorFor(name)}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                ))}
+                {selected.map((name) => {
+                  const color = colorFor(name);
+                  const range = referenceRanges.get(name);
+                  type DotProps = {
+                    cx?: number;
+                    cy?: number;
+                    value?: number | null;
+                    key?: string | number;
+                  };
+                  const renderDot = (raw: unknown, active: boolean) => {
+                    const props = (raw ?? {}) as DotProps;
+                    const { cx, cy, value } = props;
+                    if (cx == null || cy == null || value == null) {
+                      return <g key={props.key ?? `${name}-empty`} />;
+                    }
+                    const flag = flagValue(
+                      typeof value === "number" ? value : null,
+                      range,
+                    );
+                    if (flag) {
+                      return (
+                        <circle
+                          key={props.key ?? `${name}-${cx}-${cy}`}
+                          cx={cx}
+                          cy={cy}
+                          r={active ? 6 : 5}
+                          fill="#ffffff"
+                          stroke="#dc2626"
+                          strokeWidth={2}
+                        />
+                      );
+                    }
+                    return (
+                      <circle
+                        key={props.key ?? `${name}-${cx}-${cy}`}
+                        cx={cx}
+                        cy={cy}
+                        r={active ? 5 : 3}
+                        fill={color}
+                        stroke={color}
+                      />
+                    );
+                  };
+                  return (
+                    <Line
+                      key={name}
+                      type="monotone"
+                      dataKey={name}
+                      stroke={color}
+                      strokeWidth={2}
+                      dot={(p: unknown) => renderDot(p, false)}
+                      activeDot={(p: unknown) => renderDot(p, true)}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -371,11 +429,13 @@ function ChartTooltip({
   payload,
   label,
   medEventsByDate,
+  referenceRanges,
 }: {
   active?: boolean;
   payload?: TooltipItem[];
   label?: string | number;
   medEventsByDate: Map<string, MedEvent[]>;
+  referenceRanges: Map<string, Range>;
 }) {
   if (!active || !payload || payload.length === 0 || label == null) return null;
   const labelStr = String(label);
@@ -384,16 +444,34 @@ function ChartTooltip({
     <div className="rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow-md">
       <div className="mb-1 font-medium">{formatDate(labelStr)}</div>
       <ul className="space-y-0.5">
-        {payload.map((p, i) => (
-          <li key={String(p.dataKey ?? i)} className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{ background: p.color }}
-            />
-            <span>{String(p.dataKey ?? "")}:</span>
-            <span className="font-medium">{String(p.value ?? "")}</span>
-          </li>
-        ))}
+        {payload.map((p, i) => {
+          const name = String(p.dataKey ?? "");
+          const numeric =
+            typeof p.value === "number"
+              ? p.value
+              : typeof p.value === "string"
+                ? Number(p.value)
+                : null;
+          const flag = flagValue(
+            numeric != null && Number.isFinite(numeric) ? numeric : null,
+            referenceRanges.get(name),
+          );
+          return (
+            <li key={name || i} className="flex items-center gap-2">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: p.color }}
+              />
+              <span>{name}:</span>
+              <span className="font-medium">{String(p.value ?? "")}</span>
+              {flag && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                  {flag === "low" ? "Low" : "High"}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {events && events.length > 0 && (
         <div className="mt-1 border-t pt-1 text-muted-foreground">
