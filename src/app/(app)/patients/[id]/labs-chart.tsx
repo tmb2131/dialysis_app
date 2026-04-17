@@ -292,7 +292,7 @@ export function LabsChart({
                   )}
                 />
                 <Legend
-                  wrapperStyle={{ fontSize: 12 }}
+                  wrapperStyle={{ fontSize: 12, pointerEvents: "none" }}
                   iconType="line"
                   verticalAlign="top"
                   align="right"
