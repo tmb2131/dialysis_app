@@ -15,16 +15,17 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Pill } from "lucide-react";
+import { ChevronDown, Pill, Plus } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Lab, Medication } from "@/lib/types";
+import { LabPanelForm } from "./lab-panel-form";
+import { MedicationForm } from "./medication-form";
 
 const PALETTE = [
   "#0d9488", // teal-600
@@ -67,10 +68,18 @@ function groupByDate(events: MedEvent[]): Map<string, MedEvent[]> {
 export function LabsChart({
   labs,
   medications,
+  patientId,
+  labNameSuggestions,
+  medicationNameSuggestions,
 }: {
   labs: Lab[];
   medications: Medication[];
+  patientId: string;
+  labNameSuggestions: string[];
+  medicationNameSuggestions: string[];
 }) {
+  const [labPanelOpen, setLabPanelOpen] = React.useState(false);
+  const [medicationFormOpen, setMedicationFormOpen] = React.useState(false);
   const allLabNames = React.useMemo(() => {
     const names = Array.from(new Set(labs.map((l) => l.lab_name)));
     names.sort();
@@ -156,47 +165,61 @@ export function LabsChart({
 
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle>Labs over time</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Vertical markers indicate medication changes. Click one for details.
+            Flags mark medication changes. Click one for details.
           </p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
-              {selected.length} lab{selected.length === 1 ? "" : "s"} selected
-              <ChevronDown className="ml-1 h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64">
-            <div className="space-y-1 max-h-72 overflow-y-auto">
-              {allLabNames.length === 0 ? (
-                <p className="p-2 text-sm text-muted-foreground">
-                  No labs yet.
-                </p>
-              ) : (
-                allLabNames.map((name) => (
-                  <label
-                    key={name}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent"
-                  >
-                    <Checkbox
-                      checked={selected.includes(name)}
-                      onCheckedChange={() => toggle(name)}
-                    />
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: colorFor(name) }}
-                    />
-                    <span className="text-sm">{name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => setLabPanelOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Lab panel
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setMedicationFormOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Medication
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                {selected.length} lab{selected.length === 1 ? "" : "s"}
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64">
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {allLabNames.length === 0 ? (
+                  <p className="p-2 text-sm text-muted-foreground">
+                    No labs yet.
+                  </p>
+                ) : (
+                  allLabNames.map((name) => (
+                    <label
+                      key={name}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={selected.includes(name)}
+                        onCheckedChange={() => toggle(name)}
+                      />
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: colorFor(name) }}
+                      />
+                      <span className="text-sm">{name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </CardHeader>
       <CardContent>
         {!hasData ? (
@@ -210,7 +233,7 @@ export function LabsChart({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
-                margin={{ top: 10, right: 16, left: 0, bottom: 5 }}
+                margin={{ top: 28, right: 16, left: 0, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis
@@ -243,23 +266,29 @@ export function LabsChart({
                     stroke="none"
                   />
                 )}
-                {Array.from(medEventsByDate.entries()).map(([date, events]) => (
-                  <ReferenceLine
-                    key={date}
-                    x={date}
-                    stroke="#6b7280"
-                    strokeDasharray="4 4"
-                    ifOverflow="extendDomain"
-                    label={{
-                      value: "Rx",
-                      position: "insideTop",
-                      fill: "#6b7280",
-                      fontSize: 10,
-                    }}
-                    onClick={() => setActiveMarker(date)}
-                    style={{ cursor: "pointer" }}
-                  />
-                ))}
+                {Array.from(medEventsByDate.entries()).map(([date, events]) => {
+                  const active = activeMarker === date;
+                  return (
+                    <ReferenceLine
+                      key={date}
+                      x={date}
+                      stroke={active ? "#d97706" : "#9ca3af"}
+                      strokeDasharray="4 4"
+                      strokeWidth={active ? 1.5 : 1}
+                      ifOverflow="extendDomain"
+                      label={(labelProps: { viewBox?: { x?: number; y?: number } }) => (
+                        <FlagMarker
+                          viewBox={labelProps.viewBox}
+                          count={events.length}
+                          active={active}
+                          onClick={() =>
+                            setActiveMarker(active ? null : date)
+                          }
+                        />
+                      )}
+                    />
+                  );
+                })}
                 {selected.map((name) => (
                   <Line
                     key={name}
@@ -342,7 +371,88 @@ export function LabsChart({
           </div>
         )}
       </CardContent>
+
+      <LabPanelForm
+        open={labPanelOpen}
+        onOpenChange={setLabPanelOpen}
+        patientId={patientId}
+        nameSuggestions={labNameSuggestions}
+        labs={labs}
+      />
+      <MedicationForm
+        mode="create"
+        patientId={patientId}
+        open={medicationFormOpen}
+        onOpenChange={setMedicationFormOpen}
+        nameSuggestions={medicationNameSuggestions}
+      />
     </Card>
+  );
+}
+
+function FlagMarker({
+  viewBox,
+  count,
+  active,
+  onClick,
+}: {
+  viewBox?: { x?: number; y?: number };
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  if (!viewBox || viewBox.x == null || viewBox.y == null) return null;
+  const { x, y } = viewBox;
+  const size = 18;
+  const bg = active ? "#d97706" : "#ffffff";
+  const stroke = active ? "#b45309" : "#9ca3af";
+  const iconColor = active ? "#ffffff" : "#4b5563";
+  return (
+    <g
+      transform={`translate(${x - size / 2}, ${y - size - 2})`}
+      style={{ cursor: "pointer" }}
+      onClick={onClick}
+    >
+      <title>
+        {count} medication change{count === 1 ? "" : "s"} · click for details
+      </title>
+      <rect
+        width={size}
+        height={size}
+        rx={4}
+        fill={bg}
+        stroke={stroke}
+        strokeWidth={1.2}
+      />
+      {/* Lucide-style flag, scaled to fit inside the badge */}
+      <g
+        transform={`translate(${size / 2 - 6}, ${size / 2 - 6}) scale(0.5)`}
+        stroke={iconColor}
+        fill="none"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pointerEvents="none"
+      >
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1={4} y1={22} x2={4} y2={15} />
+      </g>
+      {count > 1 && (
+        <g pointerEvents="none">
+          <circle cx={size - 1} cy={1} r={5.5} fill="#dc2626" />
+          <text
+            x={size - 1}
+            y={3.5}
+            textAnchor="middle"
+            fontSize={7.5}
+            fontWeight={700}
+            fill="#ffffff"
+          >
+            {count}
+          </text>
+        </g>
+      )}
+    </g>
   );
 }
 
