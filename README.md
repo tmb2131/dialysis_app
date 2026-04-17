@@ -56,7 +56,9 @@ cp .env.local.example .env.local
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
+# Legacy alternative — either one works:
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-jwt>
 ```
 
 ### 3. Database
@@ -119,8 +121,9 @@ Open http://localhost:3000, sign in, and you're in.
 
 1. Push the repo to GitHub.
 2. Import into Vercel.
-3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
-   project's environment variables.
+3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   (or the legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`) in the project's
+   environment variables.
 4. Deploy. The middleware protects every route except `/login`.
 
 ## Project layout
