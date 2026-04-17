@@ -21,11 +21,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Pill, Plus } from "lucide-react";
+import { ChevronDown, FileText, Pill, Plus } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import type { Lab, Medication } from "@/lib/types";
+import type { ClinicalNote, Lab, Medication } from "@/lib/types";
 import { LabPanelForm } from "./lab-panel-form";
 import { MedicationForm } from "./medication-form";
+import { NoteForm } from "./note-form";
 
 const PALETTE = [
   "#0d9488", // teal-600
@@ -134,18 +135,21 @@ function makeDotRenderer(color: string, range: Range | undefined) {
 export function LabsChart({
   labs,
   medications,
+  notes,
   patientId,
   labNameSuggestions,
   medicationNameSuggestions,
 }: {
   labs: Lab[];
   medications: Medication[];
+  notes: ClinicalNote[];
   patientId: string;
   labNameSuggestions: string[];
   medicationNameSuggestions: string[];
 }) {
   const [labPanelOpen, setLabPanelOpen] = React.useState(false);
   const [medicationFormOpen, setMedicationFormOpen] = React.useState(false);
+  const [noteFormOpen, setNoteFormOpen] = React.useState(false);
   const allLabNames = React.useMemo(() => {
     const names = Array.from(new Set(labs.map((l) => l.lab_name)));
     names.sort();
@@ -180,6 +184,16 @@ export function LabsChart({
   const medEvents = React.useMemo(() => buildMedEvents(medications), [medications]);
   const medEventsByDate = React.useMemo(() => groupByDate(medEvents), [medEvents]);
 
+  const notesByDate = React.useMemo(() => {
+    const map = new Map<string, ClinicalNote[]>();
+    for (const n of notes) {
+      const list = map.get(n.note_date) ?? [];
+      list.push(n);
+      map.set(n.note_date, list);
+    }
+    return map;
+  }, [notes]);
+
   const chartData = React.useMemo(() => {
     const byDate = new Map<string, Record<string, number | string | null>>();
     for (const lab of labs) {
@@ -201,12 +215,13 @@ export function LabsChart({
     const ts: number[] = [];
     for (const row of chartData) ts.push(row.t as number);
     for (const d of medEventsByDate.keys()) ts.push(toTs(d));
+    for (const d of notesByDate.keys()) ts.push(toTs(d));
     if (ts.length === 0) return undefined;
     const min = Math.min(...ts);
     const max = Math.max(...ts);
     const pad = Math.max((max - min) * 0.02, 24 * 3600 * 1000);
     return [min - pad, max + pad];
-  }, [chartData, medEventsByDate]);
+  }, [chartData, medEventsByDate, notesByDate]);
 
   // For reference ranges: use the most common range across the selected labs.
   const referenceRanges = React.useMemo(() => {
@@ -260,8 +275,8 @@ export function LabsChart({
         <div>
           <CardTitle>Labs over time</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Flags mark medication changes. Click one for details. Points
-            ringed in red fall outside the reference range.
+            Flags mark medication changes, dots mark notes. Click one for
+            details. Points ringed in red fall outside the reference range.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -276,6 +291,14 @@ export function LabsChart({
           >
             <Plus className="h-4 w-4" />
             Medication
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setNoteFormOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Note
           </Button>
           <Popover>
             <PopoverTrigger asChild>
@@ -358,6 +381,7 @@ export function LabsChart({
                     <ChartTooltip
                       {...props}
                       medEventsByDate={medEventsByDate}
+                      notesByDate={notesByDate}
                       referenceRanges={referenceRanges}
                     />
                   )}
@@ -398,6 +422,33 @@ export function LabsChart({
                           viewBox={labelProps.viewBox}
                           count={events.length}
                           active={active}
+                          onClick={() =>
+                            setActiveMarker(active ? null : date)
+                          }
+                        />
+                      )}
+                    />
+                  );
+                })}
+                {Array.from(notesByDate.entries()).map(([date, dateNotes]) => {
+                  const active = activeMarker === date;
+                  const hasMedEvent = medEventsByDate.has(date);
+                  return (
+                    <ReferenceLine
+                      key={`note-${date}`}
+                      yAxisId="left"
+                      x={toTs(date)}
+                      stroke={active ? "#0d9488" : "#0d948899"}
+                      strokeDasharray="2 3"
+                      strokeWidth={active ? 1.5 : 1}
+                      label={(labelProps: {
+                        viewBox?: { x?: number; y?: number };
+                      }) => (
+                        <NoteMarker
+                          viewBox={labelProps.viewBox}
+                          count={dateNotes.length}
+                          active={active}
+                          stacked={hasMedEvent}
                           onClick={() =>
                             setActiveMarker(active ? null : date)
                           }
@@ -485,6 +536,7 @@ export function LabsChart({
                             <ChartTooltip
                               {...props}
                               medEventsByDate={medEventsByDate}
+                              notesByDate={notesByDate}
                               referenceRanges={referenceRanges}
                             />
                           )}
@@ -530,6 +582,40 @@ export function LabsChart({
                             );
                           },
                         )}
+                        {Array.from(notesByDate.entries()).map(
+                          ([date, dateNotes]) => {
+                            const active = activeMarker === date;
+                            const hasMedEvent = medEventsByDate.has(date);
+                            return (
+                              <ReferenceLine
+                                key={`note-${date}`}
+                                x={toTs(date)}
+                                stroke={active ? "#0d9488" : "#0d948899"}
+                                strokeDasharray="2 3"
+                                strokeWidth={active ? 1.5 : 1}
+                                label={
+                                  isTop
+                                    ? (labelProps: {
+                                        viewBox?: { x?: number; y?: number };
+                                      }) => (
+                                        <NoteMarker
+                                          viewBox={labelProps.viewBox}
+                                          count={dateNotes.length}
+                                          active={active}
+                                          stacked={hasMedEvent}
+                                          onClick={() =>
+                                            setActiveMarker(
+                                              active ? null : date,
+                                            )
+                                          }
+                                        />
+                                      )
+                                    : undefined
+                                }
+                              />
+                            );
+                          },
+                        )}
                         <Line
                           type="monotone"
                           dataKey={name}
@@ -549,67 +635,122 @@ export function LabsChart({
           </div>
         )}
 
-        {/* Medication change timeline, clickable, with marker popover below */}
-        {medEvents.length > 0 && (
-          <div className="mt-4 border-t pt-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Pill className="h-3.5 w-3.5" />
-              Medication timeline
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(medEventsByDate.entries()).map(([date, events]) => (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() =>
-                    setActiveMarker(activeMarker === date ? null : date)
-                  }
-                  className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                    activeMarker === date
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "hover:bg-accent"
-                  }`}
-                >
-                  {formatDate(date)} · {events.length} change
-                  {events.length === 1 ? "" : "s"}
-                </button>
-              ))}
-            </div>
-            {activeMarker && (
-              <div className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
-                <div className="mb-2 font-medium">
-                  {formatDate(activeMarker)}
+        {/* Medication / notes timeline, clickable, with marker popover below */}
+        {(medEvents.length > 0 || notes.length > 0) && (
+          <div className="mt-4 space-y-3 border-t pt-4">
+            {medEvents.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Pill className="h-3.5 w-3.5" />
+                  Medication timeline
                 </div>
-                <ul className="space-y-1.5">
-                  {(medEventsByDate.get(activeMarker) ?? []).map((e, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Badge kind={e.kind} />
-                      <div>
-                        <span className="font-medium">{e.med.name}</span>
-                        {e.med.dose != null && (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            · {e.med.dose}
-                            {e.med.unit ? ` ${e.med.unit}` : ""}
-                          </span>
-                        )}
-                        {e.med.frequency && (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            · {e.med.frequency}
-                          </span>
-                        )}
-                        {e.med.notes && (
-                          <div className="text-xs text-muted-foreground">
-                            {e.med.notes}
-                          </div>
-                        )}
-                      </div>
-                    </li>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(medEventsByDate.entries()).map(([date, events]) => (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() =>
+                        setActiveMarker(activeMarker === date ? null : date)
+                      }
+                      className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                        activeMarker === date
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "hover:bg-accent"
+                      }`}
+                    >
+                      {formatDate(date)} · {events.length} change
+                      {events.length === 1 ? "" : "s"}
+                    </button>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
+            {notes.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />
+                  Notes timeline
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(notesByDate.entries()).map(([date, dateNotes]) => (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() =>
+                        setActiveMarker(activeMarker === date ? null : date)
+                      }
+                      className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                        activeMarker === date
+                          ? "border-teal-600 bg-teal-50 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"
+                          : "hover:bg-accent"
+                      }`}
+                    >
+                      {formatDate(date)} · {dateNotes.length} note
+                      {dateNotes.length === 1 ? "" : "s"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {activeMarker &&
+              (medEventsByDate.has(activeMarker) ||
+                notesByDate.has(activeMarker)) && (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div className="mb-2 font-medium">
+                    {formatDate(activeMarker)}
+                  </div>
+                  {medEventsByDate.has(activeMarker) && (
+                    <ul className="space-y-1.5">
+                      {(medEventsByDate.get(activeMarker) ?? []).map((e, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Badge kind={e.kind} />
+                          <div>
+                            <span className="font-medium">{e.med.name}</span>
+                            {e.med.dose != null && (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {e.med.dose}
+                                {e.med.unit ? ` ${e.med.unit}` : ""}
+                              </span>
+                            )}
+                            {e.med.frequency && (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {e.med.frequency}
+                              </span>
+                            )}
+                            {e.med.notes && (
+                              <div className="text-xs text-muted-foreground">
+                                {e.med.notes}
+                              </div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {notesByDate.has(activeMarker) && (
+                    <ul
+                      className={`space-y-1.5 ${
+                        medEventsByDate.has(activeMarker)
+                          ? "mt-2 border-t pt-2"
+                          : ""
+                      }`}
+                    >
+                      {(notesByDate.get(activeMarker) ?? []).map((n) => (
+                        <li key={n.id} className="flex items-start gap-2">
+                          <span className="mt-0.5 inline-flex shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">
+                            Note
+                          </span>
+                          <p className="whitespace-pre-wrap text-sm">
+                            {n.content}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
           </div>
         )}
       </CardContent>
@@ -627,6 +768,12 @@ export function LabsChart({
         open={medicationFormOpen}
         onOpenChange={setMedicationFormOpen}
         nameSuggestions={medicationNameSuggestions}
+      />
+      <NoteForm
+        mode="create"
+        patientId={patientId}
+        open={noteFormOpen}
+        onOpenChange={setNoteFormOpen}
       />
     </Card>
   );
@@ -698,6 +845,79 @@ function FlagMarker({
   );
 }
 
+function NoteMarker({
+  viewBox,
+  count,
+  active,
+  stacked,
+  onClick,
+}: {
+  viewBox?: { x?: number; y?: number };
+  count: number;
+  active: boolean;
+  stacked: boolean;
+  onClick: () => void;
+}) {
+  if (!viewBox || viewBox.x == null || viewBox.y == null) return null;
+  const { x, y } = viewBox;
+  const size = 18;
+  // When a medication flag sits on the same date, shift this marker to the
+  // right so both are visible side by side. Otherwise center it on the line.
+  const tx = stacked ? x + size / 2 + 2 : x - size / 2;
+  const bg = active ? "#0d9488" : "#ffffff";
+  const stroke = active ? "#0f766e" : "#0d9488";
+  const iconColor = active ? "#ffffff" : "#0d9488";
+  return (
+    <g
+      transform={`translate(${tx}, ${y - size - 2})`}
+      style={{ cursor: "pointer" }}
+      onClick={onClick}
+    >
+      <title>
+        {count} note{count === 1 ? "" : "s"} · click for details
+      </title>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2}
+        fill={bg}
+        stroke={stroke}
+        strokeWidth={1.2}
+      />
+      {/* Lucide-style file-text icon, scaled to fit. */}
+      <g
+        transform={`translate(${size / 2 - 6}, ${size / 2 - 6}) scale(0.5)`}
+        stroke={iconColor}
+        fill="none"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pointerEvents="none"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1={8} y1={13} x2={16} y2={13} />
+        <line x1={8} y1={17} x2={16} y2={17} />
+      </g>
+      {count > 1 && (
+        <g pointerEvents="none">
+          <circle cx={size - 1} cy={1} r={5.5} fill="#dc2626" />
+          <text
+            x={size - 1}
+            y={3.5}
+            textAnchor="middle"
+            fontSize={7.5}
+            fontWeight={700}
+            fill="#ffffff"
+          >
+            {count}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
 function Badge({ kind }: { kind: "start" | "stop" }) {
   const styles =
     kind === "start"
@@ -723,17 +943,20 @@ function ChartTooltip({
   payload,
   label,
   medEventsByDate,
+  notesByDate,
   referenceRanges,
 }: {
   active?: boolean;
   payload?: TooltipItem[];
   label?: string | number;
   medEventsByDate: Map<string, MedEvent[]>;
+  notesByDate: Map<string, ClinicalNote[]>;
   referenceRanges: Map<string, Range>;
 }) {
   if (!active || !payload || payload.length === 0 || label == null) return null;
   const iso = typeof label === "number" ? tsToIso(label) : String(label);
   const events = medEventsByDate.get(iso);
+  const dateNotes = notesByDate.get(iso);
   return (
     <div className="rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow-md">
       <div className="mb-1 font-medium">{formatDate(iso)}</div>
@@ -767,9 +990,18 @@ function ChartTooltip({
           );
         })}
       </ul>
-      {events && events.length > 0 && (
+      {((events && events.length > 0) || (dateNotes && dateNotes.length > 0)) && (
         <div className="mt-1 border-t pt-1 text-muted-foreground">
-          {events.length} medication change{events.length === 1 ? "" : "s"}
+          {events && events.length > 0 && (
+            <div>
+              {events.length} medication change{events.length === 1 ? "" : "s"}
+            </div>
+          )}
+          {dateNotes && dateNotes.length > 0 && (
+            <div>
+              {dateNotes.length} note{dateNotes.length === 1 ? "" : "s"}
+            </div>
+          )}
         </div>
       )}
     </div>

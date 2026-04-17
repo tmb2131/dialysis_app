@@ -5,6 +5,7 @@ import {
   listMedications,
   listMedicationNames,
 } from "@/lib/actions/medications";
+import { listNotes } from "@/lib/actions/notes";
 import { PatientDetail } from "./patient-detail";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,11 @@ export default async function PatientPage({
   const patient = await getPatient(id);
   if (!patient) notFound();
 
-  const [labs, medications, medicationNames] = await Promise.all([
+  const [labs, medications, medicationNames, notes] = await Promise.all([
     listLabs(id),
     listMedications(id),
     listMedicationNames(),
+    listNotes(id),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function PatientPage({
       labs={labs}
       medications={medications}
       medicationNameSuggestions={medicationNames}
+      notes={notes}
     />
   );
 }
