@@ -64,7 +64,13 @@ export function PatientDetail({
         </div>
       </div>
 
-      <LabsChart labs={labs} medications={medications} />
+      <LabsChart
+        labs={labs}
+        medications={medications}
+        patientId={patient.id}
+        labNameSuggestions={labNameSuggestions}
+        medicationNameSuggestions={medicationNameSuggestions}
+      />
 
       <LabsTable
         patientId={patient.id}
