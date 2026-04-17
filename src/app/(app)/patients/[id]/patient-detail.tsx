@@ -8,19 +8,22 @@ import { PatientForm } from "@/components/patient-form";
 import { LabsChart } from "./labs-chart";
 import { LabsTable } from "./labs-table";
 import { MedicationsSection } from "./medications-section";
+import { NotesSection } from "./notes-section";
 import { calculateAge, formatDate } from "@/lib/utils";
-import type { Lab, Medication, Patient } from "@/lib/types";
+import type { ClinicalNote, Lab, Medication, Patient } from "@/lib/types";
 
 export function PatientDetail({
   patient,
   labs,
   medications,
   medicationNameSuggestions,
+  notes,
 }: {
   patient: Patient;
   labs: Lab[];
   medications: Medication[];
   medicationNameSuggestions: string[];
+  notes: ClinicalNote[];
 }) {
   const [editOpen, setEditOpen] = React.useState(false);
 
@@ -67,6 +70,7 @@ export function PatientDetail({
       <LabsChart
         labs={labs}
         medications={medications}
+        notes={notes}
         patientId={patient.id}
         labNameSuggestions={labNameSuggestions}
         medicationNameSuggestions={medicationNameSuggestions}
@@ -83,6 +87,8 @@ export function PatientDetail({
         medications={medications}
         nameSuggestions={medicationNameSuggestions}
       />
+
+      <NotesSection patientId={patient.id} notes={notes} />
 
       <PatientForm open={editOpen} onOpenChange={setEditOpen} patient={patient} />
     </div>

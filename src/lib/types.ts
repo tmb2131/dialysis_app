@@ -32,3 +32,11 @@ export type Medication = {
   end_date: string | null;
   notes: string | null;
 };
+
+export type ClinicalNote = {
+  id: string;
+  created_at: string;
+  patient_id: string;
+  note_date: string;
+  content: string;
+};
