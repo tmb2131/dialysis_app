@@ -44,6 +44,16 @@ type MedEvent = {
   med: Medication;
 };
 
+// Parse a YYYY-MM-DD ISO date at UTC noon so every timezone falls on the
+// intended calendar day on the axis.
+function toTs(iso: string): number {
+  return Date.parse(`${iso}T12:00:00Z`);
+}
+
+function tsToIso(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
 function buildMedEvents(meds: Medication[]): MedEvent[] {
   const events: MedEvent[] = [];
   for (const m of meds) {
@@ -130,16 +140,29 @@ export function LabsChart({
     const byDate = new Map<string, Record<string, number | string | null>>();
     for (const lab of labs) {
       if (!selected.includes(lab.lab_name)) continue;
-      const row = byDate.get(lab.drawn_at) ?? { date: lab.drawn_at };
+      const row =
+        byDate.get(lab.drawn_at) ?? {
+          date: lab.drawn_at,
+          t: toTs(lab.drawn_at),
+        };
       row[lab.lab_name] = lab.value;
       byDate.set(lab.drawn_at, row);
     }
     const rows = Array.from(byDate.values());
-    rows.sort((a, b) =>
-      String(a.date).localeCompare(String(b.date)),
-    );
+    rows.sort((a, b) => (a.t as number) - (b.t as number));
     return rows;
   }, [labs, selected]);
+
+  const xDomain = React.useMemo<[number, number] | undefined>(() => {
+    const ts: number[] = [];
+    for (const row of chartData) ts.push(row.t as number);
+    for (const d of medEventsByDate.keys()) ts.push(toTs(d));
+    if (ts.length === 0) return undefined;
+    const min = Math.min(...ts);
+    const max = Math.max(...ts);
+    const pad = Math.max((max - min) * 0.02, 24 * 3600 * 1000);
+    return [min - pad, max + pad];
+  }, [chartData, medEventsByDate]);
 
   // For reference ranges: use the most common range across the selected labs.
   const referenceRanges = React.useMemo(() => {
@@ -250,8 +273,11 @@ export function LabsChart({
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis
-                  dataKey="date"
-                  tickFormatter={(v) => formatDate(v)}
+                  dataKey="t"
+                  type="number"
+                  scale="time"
+                  domain={xDomain}
+                  tickFormatter={(v: number) => formatDate(tsToIso(v))}
                   tick={{ fontSize: 12 }}
                   minTickGap={24}
                 />
@@ -285,11 +311,10 @@ export function LabsChart({
                   return (
                     <ReferenceLine
                       key={date}
-                      x={date}
+                      x={toTs(date)}
                       stroke={active ? "#d97706" : "#9ca3af"}
                       strokeDasharray="4 4"
                       strokeWidth={active ? 1.5 : 1}
-                      ifOverflow="extendDomain"
                       label={(labelProps: { viewBox?: { x?: number; y?: number } }) => (
                         <FlagMarker
                           viewBox={labelProps.viewBox}
@@ -548,11 +573,11 @@ function ChartTooltip({
   referenceRanges: Map<string, Range>;
 }) {
   if (!active || !payload || payload.length === 0 || label == null) return null;
-  const labelStr = String(label);
-  const events = medEventsByDate.get(labelStr);
+  const iso = typeof label === "number" ? tsToIso(label) : String(label);
+  const events = medEventsByDate.get(iso);
   return (
     <div className="rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow-md">
-      <div className="mb-1 font-medium">{formatDate(labelStr)}</div>
+      <div className="mb-1 font-medium">{formatDate(iso)}</div>
       <ul className="space-y-0.5">
         {payload.map((p, i) => {
           const name = String(p.dataKey ?? "");
