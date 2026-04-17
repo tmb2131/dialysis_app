@@ -87,6 +87,50 @@ function flagValue(
   return null;
 }
 
+type DotProps = {
+  cx?: number;
+  cy?: number;
+  value?: number | null;
+  key?: string | number;
+};
+
+function makeDotRenderer(color: string, range: Range | undefined) {
+  return (raw: unknown, active: boolean) => {
+    const props = (raw ?? {}) as DotProps;
+    const { cx, cy, value } = props;
+    if (cx == null || cy == null || value == null) {
+      return <g key={props.key ?? "empty"} />;
+    }
+    const flag = flagValue(
+      typeof value === "number" ? value : null,
+      range,
+    );
+    if (flag) {
+      return (
+        <circle
+          key={props.key ?? `${cx}-${cy}`}
+          cx={cx}
+          cy={cy}
+          r={active ? 6 : 5}
+          fill="#ffffff"
+          stroke="#dc2626"
+          strokeWidth={2}
+        />
+      );
+    }
+    return (
+      <circle
+        key={props.key ?? `${cx}-${cy}`}
+        cx={cx}
+        cy={cy}
+        r={active ? 5 : 3}
+        fill={color}
+        stroke={color}
+      />
+    );
+  };
+}
+
 export function LabsChart({
   labs,
   medications,
@@ -183,14 +227,26 @@ export function LabsChart({
     return map;
   }, [labs, selected]);
 
+  // Latest non-null unit per selected lab, used for panel titles in small multiples.
+  const unitFor = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const name of selected) {
+      const entries = labs
+        .filter((l) => l.lab_name === name && l.unit)
+        .sort((a, b) => b.drawn_at.localeCompare(a.drawn_at));
+      if (entries.length > 0 && entries[0].unit) {
+        map.set(name, entries[0].unit);
+      }
+    }
+    return map;
+  }, [labs, selected]);
+
   const colorFor = React.useCallback(
     (name: string) => PALETTE[allLabNames.indexOf(name) % PALETTE.length],
     [allLabNames],
   );
 
   const hasData = chartData.length > 0;
-  const singleLab = selected.length === 1 ? selected[0] : null;
-  const singleRange = singleLab ? referenceRanges.get(singleLab) : undefined;
 
   function toggle(name: string) {
     setSelected((cur) =>
@@ -264,7 +320,7 @@ export function LabsChart({
               ? "Add lab entries below to see trends here."
               : "Select one or more labs to plot."}
           </div>
-        ) : (
+        ) : selected.length <= 2 ? (
           <div className="h-[22rem] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
@@ -281,7 +337,22 @@ export function LabsChart({
                   tick={{ fontSize: 12 }}
                   minTickGap={24}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis
+                  yAxisId="left"
+                  tick={{
+                    fontSize: 12,
+                    fill: selected.length === 2 ? colorFor(selected[0]) : undefined,
+                  }}
+                  stroke={selected.length === 2 ? colorFor(selected[0]) : undefined}
+                />
+                {selected.length === 2 && (
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 12, fill: colorFor(selected[1]) }}
+                    stroke={colorFor(selected[1])}
+                  />
+                )}
                 <Tooltip
                   content={(props) => (
                     <ChartTooltip
@@ -297,20 +368,27 @@ export function LabsChart({
                   verticalAlign="top"
                   align="right"
                 />
-                {singleLab && singleRange?.low != null && singleRange?.high != null && (
-                  <ReferenceArea
-                    y1={singleRange.low}
-                    y2={singleRange.high}
-                    fill={colorFor(singleLab)}
-                    fillOpacity={0.08}
-                    stroke="none"
-                  />
-                )}
+                {selected.map((name, i) => {
+                  const range = referenceRanges.get(name);
+                  if (range?.low == null || range?.high == null) return null;
+                  return (
+                    <ReferenceArea
+                      key={`range-${name}`}
+                      yAxisId={i === 0 ? "left" : "right"}
+                      y1={range.low}
+                      y2={range.high}
+                      fill={colorFor(name)}
+                      fillOpacity={0.08}
+                      stroke="none"
+                    />
+                  );
+                })}
                 {Array.from(medEventsByDate.entries()).map(([date, events]) => {
                   const active = activeMarker === date;
                   return (
                     <ReferenceLine
                       key={date}
+                      yAxisId="left"
                       x={toTs(date)}
                       stroke={active ? "#d97706" : "#9ca3af"}
                       strokeDasharray="4 4"
@@ -328,52 +406,14 @@ export function LabsChart({
                     />
                   );
                 })}
-                {selected.map((name) => {
+                {selected.map((name, i) => {
                   const color = colorFor(name);
                   const range = referenceRanges.get(name);
-                  type DotProps = {
-                    cx?: number;
-                    cy?: number;
-                    value?: number | null;
-                    key?: string | number;
-                  };
-                  const renderDot = (raw: unknown, active: boolean) => {
-                    const props = (raw ?? {}) as DotProps;
-                    const { cx, cy, value } = props;
-                    if (cx == null || cy == null || value == null) {
-                      return <g key={props.key ?? `${name}-empty`} />;
-                    }
-                    const flag = flagValue(
-                      typeof value === "number" ? value : null,
-                      range,
-                    );
-                    if (flag) {
-                      return (
-                        <circle
-                          key={props.key ?? `${name}-${cx}-${cy}`}
-                          cx={cx}
-                          cy={cy}
-                          r={active ? 6 : 5}
-                          fill="#ffffff"
-                          stroke="#dc2626"
-                          strokeWidth={2}
-                        />
-                      );
-                    }
-                    return (
-                      <circle
-                        key={props.key ?? `${name}-${cx}-${cy}`}
-                        cx={cx}
-                        cy={cy}
-                        r={active ? 5 : 3}
-                        fill={color}
-                        stroke={color}
-                      />
-                    );
-                  };
+                  const renderDot = makeDotRenderer(color, range);
                   return (
                     <Line
                       key={name}
+                      yAxisId={i === 0 ? "left" : "right"}
                       type="monotone"
                       dataKey={name}
                       stroke={color}
@@ -387,6 +427,125 @@ export function LabsChart({
                 })}
               </LineChart>
             </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="w-full space-y-3">
+            {selected.map((name, idx) => {
+              const isTop = idx === 0;
+              const isBottom = idx === selected.length - 1;
+              const color = colorFor(name);
+              const range = referenceRanges.get(name);
+              const unit = unitFor.get(name);
+              const renderDot = makeDotRenderer(color, range);
+              return (
+                <div key={name}>
+                  <div
+                    className="mb-0.5 flex items-baseline gap-2 text-xs font-medium"
+                    style={{ color }}
+                  >
+                    <span>{name}</span>
+                    {unit && (
+                      <span className="text-muted-foreground">{unit}</span>
+                    )}
+                  </div>
+                  <div style={{ height: isBottom ? 130 : 96 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={chartData}
+                        syncId="labs-over-time"
+                        margin={{
+                          top: isTop ? 20 : 4,
+                          right: 16,
+                          left: 0,
+                          bottom: isBottom ? 5 : 0,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis
+                          dataKey="t"
+                          type="number"
+                          scale="time"
+                          domain={xDomain}
+                          tickFormatter={(v: number) =>
+                            formatDate(tsToIso(v))
+                          }
+                          tick={isBottom ? { fontSize: 12 } : false}
+                          axisLine={isBottom}
+                          height={isBottom ? 30 : 1}
+                          minTickGap={24}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: color }}
+                          stroke={color}
+                          width={44}
+                          domain={["auto", "auto"]}
+                        />
+                        <Tooltip
+                          content={(props) => (
+                            <ChartTooltip
+                              {...props}
+                              medEventsByDate={medEventsByDate}
+                              referenceRanges={referenceRanges}
+                            />
+                          )}
+                        />
+                        {range?.low != null && range?.high != null && (
+                          <ReferenceArea
+                            y1={range.low}
+                            y2={range.high}
+                            fill={color}
+                            fillOpacity={0.08}
+                            stroke="none"
+                          />
+                        )}
+                        {Array.from(medEventsByDate.entries()).map(
+                          ([date, events]) => {
+                            const active = activeMarker === date;
+                            return (
+                              <ReferenceLine
+                                key={date}
+                                x={toTs(date)}
+                                stroke={active ? "#d97706" : "#9ca3af"}
+                                strokeDasharray="4 4"
+                                strokeWidth={active ? 1.5 : 1}
+                                label={
+                                  isTop
+                                    ? (labelProps: {
+                                        viewBox?: { x?: number; y?: number };
+                                      }) => (
+                                        <FlagMarker
+                                          viewBox={labelProps.viewBox}
+                                          count={events.length}
+                                          active={active}
+                                          onClick={() =>
+                                            setActiveMarker(
+                                              active ? null : date,
+                                            )
+                                          }
+                                        />
+                                      )
+                                    : undefined
+                                }
+                              />
+                            );
+                          },
+                        )}
+                        <Line
+                          type="monotone"
+                          dataKey={name}
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={(p: unknown) => renderDot(p, false)}
+                          activeDot={(p: unknown) => renderDot(p, true)}
+                          connectNulls
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
