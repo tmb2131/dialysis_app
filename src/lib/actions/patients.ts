@@ -3,15 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { todayUTCISO } from "@/lib/utils";
 import type { Patient } from "@/lib/types";
 
-const patientSchema = z.object({
-  first_name: z.string().min(1, "First name is required"),
-  last_name: z.string().min(1, "Last name is required"),
-  mrn: z.string().min(1, "MRN is required"),
-  date_of_birth: z.string().min(1, "Date of birth is required"),
-  notes: z.string().optional().nullable(),
-});
+const patientSchema = z
+  .object({
+    first_name: z.string().min(1, "First name is required"),
+    last_name: z.string().min(1, "Last name is required"),
+    mrn: z.string().min(1, "MRN is required"),
+    date_of_birth: z.string().min(1, "Date of birth is required"),
+    notes: z.string().optional().nullable(),
+  })
+  .refine((v) => v.date_of_birth <= todayUTCISO(), {
+    message: "Date of birth cannot be in the future",
+    path: ["date_of_birth"],
+  });
 
 export type PatientInput = z.infer<typeof patientSchema>;
 

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type { Medication } from "@/lib/types";
 
-const medicationSchema = z.object({
+const medicationBaseSchema = z.object({
   patient_id: z.string().uuid(),
   name: z.string().min(1, "Medication name is required"),
   dose: z.number().finite().nullable().optional(),
@@ -14,6 +14,14 @@ const medicationSchema = z.object({
   start_date: z.string().min(1, "Start date is required"),
   end_date: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+});
+
+const endAfterStart = (v: { start_date: string; end_date?: string | null }) =>
+  !v.end_date || v.end_date >= v.start_date;
+
+const medicationSchema = medicationBaseSchema.refine(endAfterStart, {
+  message: "End date must be on or after start date",
+  path: ["end_date"],
 });
 
 export type MedicationInput = z.infer<typeof medicationSchema>;
@@ -57,9 +65,12 @@ export async function createMedication(input: MedicationInput) {
   return { ok: true };
 }
 
-const medUpdateSchema = medicationSchema.extend({
-  id: z.string().uuid(),
-});
+const medUpdateSchema = medicationBaseSchema
+  .extend({ id: z.string().uuid() })
+  .refine(endAfterStart, {
+    message: "End date must be on or after start date",
+    path: ["end_date"],
+  });
 
 export async function updateMedication(input: z.infer<typeof medUpdateSchema>) {
   const parsed = medUpdateSchema.safeParse(input);

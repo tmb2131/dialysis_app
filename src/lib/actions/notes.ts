@@ -3,12 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { todayUTCISO } from "@/lib/utils";
 import type { ClinicalNote } from "@/lib/types";
 
-const noteSchema = z.object({
+const noteBaseSchema = z.object({
   patient_id: z.string().uuid(),
   note_date: z.string().min(1, "Date is required"),
   content: z.string().min(1, "Note content is required"),
+});
+
+const noteDateNotInFuture = (v: { note_date: string }) =>
+  v.note_date <= todayUTCISO();
+
+const noteSchema = noteBaseSchema.refine(noteDateNotInFuture, {
+  message: "Note date cannot be in the future",
+  path: ["note_date"],
 });
 
 export type NoteInput = z.infer<typeof noteSchema>;
@@ -40,9 +49,12 @@ export async function createNote(input: NoteInput) {
   return { ok: true };
 }
 
-const noteUpdateSchema = noteSchema.extend({
-  id: z.string().uuid(),
-});
+const noteUpdateSchema = noteBaseSchema
+  .extend({ id: z.string().uuid() })
+  .refine(noteDateNotInFuture, {
+    message: "Note date cannot be in the future",
+    path: ["note_date"],
+  });
 
 export async function updateNote(input: z.infer<typeof noteUpdateSchema>) {
   const parsed = noteUpdateSchema.safeParse(input);

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { createPanel } from "@/lib/actions/labs";
-import { formatDateISO } from "@/lib/utils";
+import { todayLocalISO } from "@/lib/utils";
 import type { Lab } from "@/lib/types";
 
 type Row = {
@@ -76,7 +76,7 @@ export function LabPanelForm({
   labs: Lab[];
 }) {
   const router = useRouter();
-  const [date, setDate] = React.useState(formatDateISO(new Date()));
+  const [date, setDate] = React.useState(todayLocalISO());
   const [rows, setRows] = React.useState<Row[]>([newRow()]);
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -84,7 +84,7 @@ export function LabPanelForm({
 
   React.useEffect(() => {
     if (open) {
-      setDate(formatDateISO(new Date()));
+      setDate(todayLocalISO());
       setRows([newRow()]);
     }
   }, [open]);
@@ -131,6 +131,14 @@ export function LabPanelForm({
     for (const e of entries) {
       if (!Number.isFinite(e.value)) {
         toast.error(`Invalid value for ${e.lab_name}`);
+        return;
+      }
+      if (
+        e.reference_range_low != null &&
+        e.reference_range_high != null &&
+        e.reference_range_low > e.reference_range_high
+      ) {
+        toast.error(`${e.lab_name}: reference low must be ≤ high`);
         return;
       }
     }

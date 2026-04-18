@@ -48,6 +48,12 @@ export function LabEditForm({
       toast.error("Value must be a number.");
       return;
     }
+    const lowNum = low.trim() ? Number(low) : null;
+    const highNum = high.trim() ? Number(high) : null;
+    if (lowNum != null && highNum != null && lowNum > highNum) {
+      toast.error("Reference low must be ≤ high.");
+      return;
+    }
     setSubmitting(true);
     const result = await updateLab({
       id: lab.id,
@@ -56,8 +62,8 @@ export function LabEditForm({
       drawn_at: date,
       value: num,
       unit: unit.trim() || null,
-      reference_range_low: low.trim() ? Number(low) : null,
-      reference_range_high: high.trim() ? Number(high) : null,
+      reference_range_low: lowNum,
+      reference_range_high: highNum,
     });
     setSubmitting(false);
     if ("error" in result && result.error) {

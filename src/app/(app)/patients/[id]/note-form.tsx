@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createNote, updateNote } from "@/lib/actions/notes";
-import { formatDateISO } from "@/lib/utils";
+import { todayLocalISO } from "@/lib/utils";
 import type { ClinicalNote } from "@/lib/types";
 
 type Props =
@@ -42,14 +42,14 @@ export function NoteForm(props: Props) {
   const router = useRouter();
 
   const [noteDate, setNoteDate] = React.useState(
-    note?.note_date ?? formatDateISO(new Date()),
+    note?.note_date ?? todayLocalISO(),
   );
   const [content, setContent] = React.useState(note?.content ?? "");
   const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
-      setNoteDate(note?.note_date ?? formatDateISO(new Date()));
+      setNoteDate(note?.note_date ?? todayLocalISO());
       setContent(note?.content ?? "");
     }
   }, [open, note]);
@@ -58,6 +58,10 @@ export function NoteForm(props: Props) {
     e.preventDefault();
     if (!noteDate) {
       toast.error("Date is required.");
+      return;
+    }
+    if (noteDate > todayLocalISO()) {
+      toast.error("Note date cannot be in the future.");
       return;
     }
     if (!content.trim()) {
@@ -104,6 +108,7 @@ export function NoteForm(props: Props) {
             <Input
               id="note_date"
               type="date"
+              max={todayLocalISO()}
               value={noteDate}
               onChange={(e) => setNoteDate(e.target.value)}
               required

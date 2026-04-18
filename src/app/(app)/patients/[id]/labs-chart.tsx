@@ -173,11 +173,10 @@ export function LabsChart({
     return ordered;
   }, [labs]);
 
+  // Seed from the top-4 most recent labs on first render only. Updating
+  // `selected` from `defaultSelected` on every change would clobber the
+  // user's selection every time a new panel is saved.
   const [selected, setSelected] = React.useState<string[]>(defaultSelected);
-
-  React.useEffect(() => {
-    setSelected(defaultSelected);
-  }, [defaultSelected]);
 
   const [activeMarker, setActiveMarker] = React.useState<string | null>(null);
 
