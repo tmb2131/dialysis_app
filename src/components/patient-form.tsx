@@ -19,13 +19,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createPatient, updatePatient } from "@/lib/actions/patients";
+import { todayLocalISO } from "@/lib/utils";
 import type { Patient } from "@/lib/types";
 
 const schema = z.object({
   first_name: z.string().min(1, "Required"),
   last_name: z.string().min(1, "Required"),
   mrn: z.string().min(1, "Required"),
-  date_of_birth: z.string().min(1, "Required"),
+  date_of_birth: z
+    .string()
+    .min(1, "Required")
+    .refine((v) => v <= todayLocalISO(), "Date cannot be in the future"),
   notes: z.string().optional(),
 });
 
@@ -133,6 +137,7 @@ export function PatientForm({
               <Input
                 id="date_of_birth"
                 type="date"
+                max={todayLocalISO()}
                 {...register("date_of_birth")}
               />
               {errors.date_of_birth && (

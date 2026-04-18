@@ -30,3 +30,17 @@ export function formatDateISO(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toISOString().split("T")[0];
 }
+
+// Today's date as YYYY-MM-DD in the *local* timezone. Use this for form
+// defaults — `new Date().toISOString()` returns UTC and silently shifts the
+// date by one day for users west of UTC late in the day.
+export function todayLocalISO(): string {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+// Server-side "today" in UTC. Used as a lenient upper bound for date
+// validation in server actions; clients are already guarded by browser
+// `max` attributes + the stricter local check.
+export function todayUTCISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}

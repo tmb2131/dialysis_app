@@ -5,12 +5,25 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type { Lab } from "@/lib/types";
 
-const labEntrySchema = z.object({
+const labEntryBaseSchema = z.object({
   lab_name: z.string().min(1),
   value: z.number().finite(),
   unit: z.string().optional().nullable(),
   reference_range_low: z.number().finite().optional().nullable(),
   reference_range_high: z.number().finite().optional().nullable(),
+});
+
+const rangeLowAtMostHigh = (v: {
+  reference_range_low?: number | null;
+  reference_range_high?: number | null;
+}) =>
+  v.reference_range_low == null ||
+  v.reference_range_high == null ||
+  v.reference_range_low <= v.reference_range_high;
+
+const labEntrySchema = labEntryBaseSchema.refine(rangeLowAtMostHigh, {
+  message: "Reference low must be ≤ reference high",
+  path: ["reference_range_high"],
 });
 
 const panelSchema = z.object({
@@ -54,11 +67,16 @@ export async function createPanel(input: PanelInput) {
   return { ok: true };
 }
 
-const labUpdateSchema = labEntrySchema.extend({
-  id: z.string().uuid(),
-  patient_id: z.string().uuid(),
-  drawn_at: z.string().min(1),
-});
+const labUpdateSchema = labEntryBaseSchema
+  .extend({
+    id: z.string().uuid(),
+    patient_id: z.string().uuid(),
+    drawn_at: z.string().min(1),
+  })
+  .refine(rangeLowAtMostHigh, {
+    message: "Reference low must be ≤ reference high",
+    path: ["reference_range_high"],
+  });
 
 export async function updateLab(input: z.infer<typeof labUpdateSchema>) {
   const parsed = labUpdateSchema.safeParse(input);

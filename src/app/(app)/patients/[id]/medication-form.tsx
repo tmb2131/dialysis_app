@@ -25,7 +25,7 @@ import {
   replaceMedication,
   updateMedication,
 } from "@/lib/actions/medications";
-import { formatDateISO } from "@/lib/utils";
+import { todayLocalISO } from "@/lib/utils";
 import type { Medication } from "@/lib/types";
 
 type Props =
@@ -61,13 +61,13 @@ export function MedicationForm(props: Props) {
   const [unit, setUnit] = React.useState(medication?.unit ?? "");
   const [frequency, setFrequency] = React.useState(medication?.frequency ?? "");
   const [startDate, setStartDate] = React.useState(
-    medication?.start_date ?? formatDateISO(new Date()),
+    medication?.start_date ?? todayLocalISO(),
   );
   const [endDate, setEndDate] = React.useState(medication?.end_date ?? "");
   const [notes, setNotes] = React.useState(medication?.notes ?? "");
   const [editMode, setEditMode] = React.useState<EditMode>("edit-in-place");
   const [newStartDate, setNewStartDate] = React.useState(
-    formatDateISO(new Date()),
+    todayLocalISO(),
   );
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -77,11 +77,11 @@ export function MedicationForm(props: Props) {
       setDose(medication?.dose != null ? String(medication.dose) : "");
       setUnit(medication?.unit ?? "");
       setFrequency(medication?.frequency ?? "");
-      setStartDate(medication?.start_date ?? formatDateISO(new Date()));
+      setStartDate(medication?.start_date ?? todayLocalISO());
       setEndDate(medication?.end_date ?? "");
       setNotes(medication?.notes ?? "");
       setEditMode("edit-in-place");
-      setNewStartDate(formatDateISO(new Date()));
+      setNewStartDate(todayLocalISO());
     }
   }, [open, medication]);
 
@@ -99,6 +99,11 @@ export function MedicationForm(props: Props) {
     const doseNum = dose.trim() ? Number(dose) : null;
     if (doseNum != null && !Number.isFinite(doseNum)) {
       toast.error("Dose must be a number.");
+      return;
+    }
+
+    if (endDate && endDate < startDate) {
+      toast.error("End date must be on or after start date.");
       return;
     }
 
@@ -272,6 +277,7 @@ export function MedicationForm(props: Props) {
                 <Input
                   id="end_date"
                   type="date"
+                  min={startDate || undefined}
                   value={endDate ?? ""}
                   onChange={(e) => setEndDate(e.target.value)}
                 />
