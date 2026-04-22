@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev        # dev server on http://localhost:3000
+npm run dev        # dev server on http://localhost:3000 (expects hosted Supabase URL+key in .env.local)
+npm run dev:local  # dev against local `supabase start` (sets SUPABASE_USE_LOCAL_DEV)
 npm run build      # production build
 npm run start      # run built app
 npm run lint       # eslint (next lint)
@@ -22,10 +23,11 @@ supabase db push                           # apply migrations in supabase/migrat
 psql "$DATABASE_URL" -f supabase/seed.sql  # demo patients
 ```
 
-Environment: copy `.env.local.example` → `.env.local`. Either
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (newer `sb_publishable_…`) or
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy JWT) works — the resolution lives in
-`src/lib/supabase/env.ts`.
+Environment: copy `.env.local.example` → `.env.local` with the **same** Supabase
+URL and anon/publishable key as production (unless you use `npm run dev:local` for
+local `supabase start`). Either `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (newer
+`sb_publishable_…`) or `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy JWT) works — the
+resolution lives in `src/lib/supabase/env.ts`.
 
 ## Architecture
 
