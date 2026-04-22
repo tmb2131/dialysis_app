@@ -92,23 +92,7 @@ export function PatientListClient({
                       href={`/patients/${p.id}`}
                       className="block w-full"
                     >
-                      <div className="flex items-center gap-2">
-                        <span>{p.last_name}, {p.first_name}</span>
-                        {p.flag_count > 0 ? (
-                          <span
-                            className={[
-                              "inline-block h-2.5 w-2.5 rounded-full",
-                              p.flag_count >= 3 ? "bg-destructive animate-pulse" : "bg-amber-500",
-                            ].join(" ")}
-                            title={`${
-                              p.flag_count
-                            } out-of-range value${p.flag_count === 1 ? "" : "s"} in latest panel${
-                              p.latest_panel_at ? ` (${formatDate(p.latest_panel_at)})` : ""
-                            }: ${p.flagged_labs.join(", ")}`}
-                            aria-label={`${p.flag_count} out-of-range labs`}
-                          />
-                        ) : null}
-                      </div>
+                      <span>{p.last_name}, {p.first_name}</span>
                       <div className="text-xs font-normal text-muted-foreground md:hidden">
                         MRN {p.mrn} · {formatDate(p.date_of_birth)}
                         {renderActivityText(p.latest_panel_at, p.latest_note_at) ? (
