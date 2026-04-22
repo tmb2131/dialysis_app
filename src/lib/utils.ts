@@ -44,3 +44,28 @@ export function todayLocalISO(): string {
 export function todayUTCISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export function formatRelativeDays(date: string | Date): string {
+  const value = typeof date === "string" ? new Date(date) : date;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOfValue = new Date(value);
+  startOfValue.setHours(0, 0, 0, 0);
+
+  const diffMs = startOfToday.getTime() - startOfValue.getTime();
+  const days = Math.floor(diffMs / 86400000);
+
+  if (days <= 0) return "today";
+  if (days === 1) return "1d ago";
+  if (days < 14) return `${days}d ago`;
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `${weeks}w ago`;
+
+  const months = Math.floor(days / 30);
+  if (months < 24) return `${months}mo ago`;
+
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
