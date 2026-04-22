@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { FlaskConical, NotebookPen, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,16 +15,17 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { PatientForm } from "@/components/patient-form";
-import { calculateAge, formatDate } from "@/lib/utils";
-import type { Patient } from "@/lib/types";
+import { calculateAge, formatDate, formatRelativeDays } from "@/lib/utils";
+import type { PatientSummary } from "@/lib/actions/patients";
 
 export function PatientListClient({
   initialPatients,
 }: {
-  initialPatients: Patient[];
+  initialPatients: PatientSummary[];
 }) {
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
+  const shouldAnimate = search.trim() === "";
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,6 +62,7 @@ export function PatientListClient({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead className="hidden md:table-cell">MRN</TableHead>
+              <TableHead className="hidden md:table-cell">Activity</TableHead>
               <TableHead className="hidden sm:table-cell">DOB</TableHead>
               <TableHead className="hidden md:table-cell">Age</TableHead>
             </TableRow>
@@ -68,29 +70,67 @@ export function PatientListClient({
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   {initialPatients.length === 0
                     ? "No patients yet. Click “Add patient” to get started."
                     : "No matches."}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
-                <TableRow key={p.id} className="cursor-pointer">
+              filtered.map((p, index) => (
+                <TableRow
+                  key={p.id}
+                  className={shouldAnimate ? "cursor-pointer row-fade-in" : "cursor-pointer"}
+                  style={
+                    shouldAnimate
+                      ? { animationDelay: `${Math.min(index, 8) * 35}ms` }
+                      : undefined
+                  }
+                >
                   <TableCell className="font-medium">
                     <Link
                       href={`/patients/${p.id}`}
-                      className="block w-full hover:underline"
+                      className="block w-full"
                     >
-                      {p.last_name}, {p.first_name}
+                      <div className="flex items-center gap-2">
+                        <span>{p.last_name}, {p.first_name}</span>
+                        {p.flag_count > 0 ? (
+                          <span
+                            className={[
+                              "inline-block h-2.5 w-2.5 rounded-full",
+                              p.flag_count >= 3 ? "bg-destructive animate-pulse" : "bg-amber-500",
+                            ].join(" ")}
+                            title={`${
+                              p.flag_count
+                            } out-of-range value${p.flag_count === 1 ? "" : "s"} in latest panel${
+                              p.latest_panel_at ? ` (${formatDate(p.latest_panel_at)})` : ""
+                            }: ${p.flagged_labs.join(", ")}`}
+                            aria-label={`${p.flag_count} out-of-range labs`}
+                          />
+                        ) : null}
+                      </div>
                       <div className="text-xs font-normal text-muted-foreground md:hidden">
                         MRN {p.mrn} · {formatDate(p.date_of_birth)}
+                        {renderActivityText(p.latest_panel_at, p.latest_note_at) ? (
+                          <>
+                            {" · "}
+                            {renderActivityText(p.latest_panel_at, p.latest_note_at)}
+                          </>
+                        ) : null}
                       </div>
                     </Link>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Link href={`/patients/${p.id}`} className="block">
                       {p.mrn}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    <Link href={`/patients/${p.id}`} className="block">
+                      <ActivityCell
+                        latestPanelAt={p.latest_panel_at}
+                        latestNoteAt={p.latest_note_at}
+                      />
                     </Link>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -112,4 +152,35 @@ export function PatientListClient({
       <PatientForm open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
+}
+
+function ActivityCell({
+  latestPanelAt,
+  latestNoteAt,
+}: {
+  latestPanelAt: string | null;
+  latestNoteAt: string | null;
+}) {
+  const activityDate = pickLatest(latestPanelAt, latestNoteAt);
+  if (!activityDate) return <span>—</span>;
+  const source = activityDate === latestPanelAt ? "lab" : "note";
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {source === "lab" ? <FlaskConical className="h-3.5 w-3.5" /> : <NotebookPen className="h-3.5 w-3.5" />}
+      {formatRelativeDays(activityDate)}
+    </span>
+  );
+}
+
+function renderActivityText(latestPanelAt: string | null, latestNoteAt: string | null) {
+  const activityDate = pickLatest(latestPanelAt, latestNoteAt);
+  if (!activityDate) return null;
+  return formatRelativeDays(activityDate);
+}
+
+function pickLatest(panelAt: string | null, noteAt: string | null) {
+  if (!panelAt) return noteAt;
+  if (!noteAt) return panelAt;
+  return panelAt >= noteAt ? panelAt : noteAt;
 }
